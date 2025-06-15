@@ -23,14 +23,19 @@ app.post("/scrape", async (req, res) => {
     });
 
     const page = await browser.newPage();
-    await page.goto("https://www.facebook.com/ads/library", {
-      waitUntil: "networkidle2"
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    );
+
+    await page.goto("https://www.facebook.com/ads/library/", {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
     });
 
     await page.waitForSelector('[data-testid="search-input"]', { timeout: 10000 });
     await page.type('[data-testid="search-input"]', keyword);
     await page.keyboard.press("Enter");
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(8000);
 
     const results = await page.evaluate(() => {
       const ads = [];
@@ -38,8 +43,8 @@ app.post("/scrape", async (req, res) => {
       cards.forEach((card, index) => {
         if (index < 3) {
           ads.push({
-            page: card.querySelector('[data-testid="actor-name"]')?.innerText || "Tidak ditemukan",
-            caption: card.querySelector('[data-testid="ad-creative-body"]')?.innerText || "Tidak ada caption",
+            page: card.querySelector('[data-testid="actor-name"]')?.innerText || "-",
+            caption: card.querySelector('[data-testid="ad-creative-body"]')?.innerText || "-",
             link: card.querySelector("a[href*='ads/library']")?.href || "-"
           });
         }
@@ -50,9 +55,12 @@ app.post("/scrape", async (req, res) => {
     await browser.close();
     res.json({ keyword, results });
 
-  } catch (err) {
-    console.error("❌ ERROR SAAT SCRAPING:", err.message);
-    res.status(500).json({ error: "Gagal scraping", detail: err.message });
+  } catch (error) {
+    console.error("❌ ERROR:", error.message);
+    res.status(500).json({
+      error: "Scraping gagal",
+      detail: error.message
+    });
   }
 });
 
@@ -60,5 +68,5 @@ app.get("/", (req, res) => res.send("✅ Scraper jalan!"));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("✅ Server jalan di port", PORT);
+  console.log("✅ Server aktif di port", PORT);
 });
