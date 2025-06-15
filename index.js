@@ -10,39 +10,51 @@ app.post("/scrape", async (req, res) => {
     const browser = await puppeteer.launch({
       headless: true,
       args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--disable-gpu",
-        "--no-zygote",
-        "--single-process",
-        "--no-first-run",
-        "--no-default-browser-check"
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--disable-gpu',
+        '--no-zygote',
+        '--single-process',
+        '--no-first-run',
+        '--no-default-browser-check'
       ]
     });
 
     const page = await browser.newPage();
+
     await page.setUserAgent(
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
 
-    await page.goto("https://www.facebook.com/ads/library", {
+    await page.goto("https://www.facebook.com/ads/library/", {
       waitUntil: "domcontentloaded",
       timeout: 60000
     });
 
-    // tunggu input pencarian muncul aman
-    const found = await page.waitForSelector('[data-testid="search-input"]', { timeout: 15000 }).catch(() => null);
+    // Retry loop untuk deteksi search input
+    let inputBox;
+    let retries = 5;
 
-    if (!found) {
-      throw new Error("Input pencarian tidak ditemukan (mungkin halaman redirect/login?)");
+    while (retries > 0) {
+      try {
+        inputBox = await page.waitForSelector('[data-testid="search-input"]', { timeout: 5000 });
+        if (inputBox) break;
+      } catch (err) {
+        console.log(`🔄 Retry detect search input (${6 - retries}/5)...`);
+        retries--;
+      }
     }
 
-    await page.type('[data-testid="search-input"]', keyword);
+    if (!inputBox) {
+      throw new Error("Input pencarian tidak ditemukan setelah beberapa percobaan");
+    }
+
+    await inputBox.type(keyword);
     await page.keyboard.press("Enter");
 
-    // tunggu hasil muncul dan stabil
+    // Tunggu hasil keluar
     await page.waitForTimeout(8000);
 
     const results = await page.evaluate(() => {
@@ -65,7 +77,7 @@ app.post("/scrape", async (req, res) => {
 
   } catch (error) {
     console.error("❌ ERROR SAAT SCRAPING:", error.message);
-    res.status(500).json({ error: "Gagal scraping", detail: error.message });
+    res.status(500).json({ error: "Scraping gagal", detail: error.message });
   }
 });
 
