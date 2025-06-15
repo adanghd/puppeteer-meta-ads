@@ -10,15 +10,15 @@ app.post("/scrape", async (req, res) => {
     const browser = await puppeteer.launch({
       headless: true,
       args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--no-zygote',
-        '--single-process',
-        '--no-first-run',
-        '--no-default-browser-check'
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-accelerated-2d-canvas",
+        "--disable-gpu",
+        "--no-zygote",
+        "--single-process",
+        "--no-first-run",
+        "--no-default-browser-check"
       ]
     });
 
@@ -27,14 +27,22 @@ app.post("/scrape", async (req, res) => {
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     );
 
-    await page.goto("https://www.facebook.com/ads/library/", {
+    await page.goto("https://www.facebook.com/ads/library", {
       waitUntil: "domcontentloaded",
       timeout: 60000
     });
 
-    await page.waitForSelector('[data-testid="search-input"]', { timeout: 10000 });
+    // tunggu input pencarian muncul aman
+    const found = await page.waitForSelector('[data-testid="search-input"]', { timeout: 15000 }).catch(() => null);
+
+    if (!found) {
+      throw new Error("Input pencarian tidak ditemukan (mungkin halaman redirect/login?)");
+    }
+
     await page.type('[data-testid="search-input"]', keyword);
     await page.keyboard.press("Enter");
+
+    // tunggu hasil muncul dan stabil
     await page.waitForTimeout(8000);
 
     const results = await page.evaluate(() => {
@@ -56,11 +64,8 @@ app.post("/scrape", async (req, res) => {
     res.json({ keyword, results });
 
   } catch (error) {
-    console.error("❌ ERROR:", error.message);
-    res.status(500).json({
-      error: "Scraping gagal",
-      detail: error.message
-    });
+    console.error("❌ ERROR SAAT SCRAPING:", error.message);
+    res.status(500).json({ error: "Gagal scraping", detail: error.message });
   }
 });
 
